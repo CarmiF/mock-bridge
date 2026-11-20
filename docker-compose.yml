@@ -1,0 +1,63 @@
+###############################################################################
+# Mock Bridge -- manual stand-in for fs_uart_bridge, in its own container.
+#
+#   ./scripts/run_gui.sh          GUI (grants and revokes X access for you)
+#   ./scripts/run_console.sh      keyboard console, no display needed
+#   ./scripts/run_tests.sh        the test suite inside the image
+#
+# !! NEVER bring this up while the real bridge is publishing. Both would
+# publish the same topics and the Orchestrator would see interleaved values.
+# Stop the vehicle stack first (`docker compose -f ../pedal_node/
+# docker-compose.yml down`), or set ENABLE_BRIDGE=false there. The node warns
+# a few seconds after startup if it finds a rival publisher.
+###############################################################################
+services:
+  mock_bridge:
+    image: bgr_mock_bridge:latest
+    container_name: mock_bridge
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # fs_msgs lives in the pedal_node workspace, which is not under this
+      # folder; a named context copies it in without making the whole repo
+      # the build context (the repo root .dockerignore excludes it anyway).
+      additional_contexts:
+        fs_msgs: ../pedal_node/src/fs_msgs
+
+    # Host networking puts the container and everything on the host on one
+    # DDS graph -- the same mode the vehicle stack uses, so the Orchestrator
+    # sees this node wherever it runs.
+    network_mode: host
+    ipc: host                   # host /dev/shm, for Fast DDS shared memory
+    init: true                  # reaps children, forwards the stop signal
+
+    # SIGINT, not Docker's default SIGTERM: `ros2 launch` handles only SIGINT.
+    # On SIGTERM the GUI dies without stopping its publishers.
+    stop_signal: SIGINT
+    stop_grace_period: 15s
+
+    environment:
+      # Must match the Orchestrator's container exactly.
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      ROS_AUTOMATIC_DISCOVERY_RANGE: ${ROS_DISCOVERY_RANGE:-SUBNET}
+      # UDP only. Over shared memory, nothing on the host can read this
+      # root-owned container's samples, and the denial is silent -- the same
+      # trap documented in pedal_node's README.
+      FASTDDS_BUILTIN_TRANSPORTS: ${FASTDDS_BUILTIN_TRANSPORTS:-UDPv4}
+
+      # X11. run_gui.sh grants the container access before `up` and takes it
+      # away afterwards; without that the GUI exits with "could not connect to
+      # display".
+      DISPLAY: ${DISPLAY:-:0}
+      QT_X11_NO_MITSHM: 1        # MIT-SHM does not cross the container boundary
+      RCUTILS_COLORIZED_OUTPUT: 1
+      PYTHONUNBUFFERED: 1
+
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # The sources, so a code change needs a restart rather than a rebuild.
+      # --symlink-install in the image means the installed package points at
+      # these files. Read-only: the container has no business editing them.
+      - ./mock_bridge:/mock_bridge_ws/src/mock_bridge/mock_bridge:ro
+      - ./launch:/mock_bridge_ws/src/mock_bridge/launch:ro
+      - ./tests:/mock_bridge_ws/src/mock_bridge/tests:ro

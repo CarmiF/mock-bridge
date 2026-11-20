@@ -1,0 +1,8 @@
+# The build context is this folder; keep host build output and caches out of
+# it so a local colcon build or venv never changes the image.
+build/
+install/
+log/
+.pytest_cache/
+__pycache__/
+*.py[cod]

@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<package format="3">
+  <name>mock_bridge</name>
+  <version>0.1.0</version>
+  <description>
+    Manual ROS 2 mock of the fs_uart_bridge, for testing the real Orchestrator
+    without the VCU, STM32, UART or vehicle. Publishes AS state, mission and GO
+    at 10 Hz only while selected, and displays the Orchestrator's
+    state/override feedback without acting on it.
+  </description>
+  <maintainer email="carmi@example.invalid">carmi</maintainer>
+  <license>Proprietary</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>fs_msgs</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
+  <!-- The managed nodes' /monitor heartbeat, so fs_watchdog sees them. -->
+  <exec_depend>diagnostic_msgs</exec_depend>
+  <!-- PySide6 is deliberately NOT a rosdep key here: there is no
+       python3-pyside6 in the Ubuntu 24.04 archive, so a key would make
+       `rosdep install` fail. The Docker image pip-installs it
+       (PLAN.md step 4); the console entry point needs no Qt at all. -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
